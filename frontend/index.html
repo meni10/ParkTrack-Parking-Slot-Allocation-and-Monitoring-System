@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+    <div class="app-shell">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar" aria-label="Primary Navigation">
+            <div class="sidebar-brand">
+                <div class="brand-icon" aria-hidden="true">P</div>
+                <div class="brand-text">
+                    <span class="brand-title">SmartPark</span>
+                    <span class="brand-subtitle">Admin Console</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button type="button" class="nav-item active" data-view="dashboard">
+                    <span class="nav-dot" aria-hidden="true"></span>
+                    <span>Dashboard</span>
+                </button>
+                <button type="button" class="nav-item" data-view="parking">
+                    <span class="nav-dot" aria-hidden="true"></span>
+                    <span>Parking Management</span>
+                </button>
+                <button type="button" class="nav-item" data-view="checkin">
+                    <span class="nav-dot" aria-hidden="true"></span>
+                    <span>Vehicle Check-in</span>
+                </button>
+                <button type="button" class="nav-item" data-view="checkout">
+                    <span class="nav-dot" aria-hidden="true"></span>
+                    <span>Vehicle Check-out</span>
+                </button>
+                <button type="button" class="nav-item" data-view="history">
+                    <span class="nav-dot" aria-hidden="true"></span>
+                    <span>Parking History</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="api-status-card">
+                    <div class="api-status-row">
+                        <span id="api-status-indicator" class="status-dot status-checking"></span>
+                        <span id="api-status-text" class="api-status-label">Checking API...</span>
+                    </div>
+                    <div class="api-url-text">http://localhost:8080</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button type="button" id="menu-toggle" class="menu-toggle" aria-label="Toggle Navigation" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div>
+                        <h1 id="page-title" class="page-title">Dashboard</h1>
+                        <p id="page-subtitle" class="page-subtitle">Real-time parking capacity and operations overview</p>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <span id="last-updated" class="last-updated">Not synced yet</span>
+                    <button type="button" id="refresh-btn" class="btn btn-secondary">
+                        Refresh
+                    </button>
+                </div>
+            </header>
+
+            <div id="global-loader" class="global-loader hidden" role="status" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
+                <span>Loading data from server...</span>
+            </div>
+
+            <main class="content">
+                <!-- 1. Dashboard View -->
+                <section id="view-dashboard" class="view-section active" aria-labelledby="page-title">
+                    <div class="kpi-grid">
+                        <article class="kpi-card">
+                            <span class="kpi-label">Total Parking Spots</span>
+                            <strong id="kpi-total-spots" class="kpi-value">--</strong>
+                            <span class="kpi-meta">Across all floors</span>
+                        </article>
+                        <article class="kpi-card kpi-available">
+                            <span class="kpi-label">Available Spots</span>
+                            <strong id="kpi-available-spots" class="kpi-value">--</strong>
+                            <span class="kpi-meta">Ready for allocation</span>
+                        </article>
+                        <article class="kpi-card kpi-occupied">
+                            <span class="kpi-label">Occupied Spots</span>
+                            <strong id="kpi-occupied-spots" class="kpi-value">--</strong>
+                            <span id="kpi-occupancy-rate" class="kpi-meta">--% occupancy</span>
+                        </article>
+                        <article class="kpi-card kpi-other">
+                            <span class="kpi-label">Reserved / Out of Service</span>
+                            <strong id="kpi-other-spots" class="kpi-value">--</strong>
+                            <span id="kpi-other-breakdown" class="kpi-meta">0 reserved, 0 out of service</span>
+                        </article>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Parking Availability Overview</h2>
+                                    <p class="panel-subtitle">Live available spots by spot category</p>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline" data-nav="parking">View Floors</button>
+                            </div>
+                            <div id="availability-breakdown" class="availability-list">
+                                <p class="empty-state">Loading availability...</p>
+                            </div>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Active Parking Sessions</h2>
+                                    <p class="panel-subtitle">Currently parked vehicles</p>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline" data-nav="checkin">New Check-in</button>
+                            </div>
+                            <div id="dashboard-active-tickets" class="table-responsive">
+                                <p class="empty-state">Loading active sessions...</p>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <!-- 2. Parking Management View -->
+                <section id="view-parking" class="view-section">
+                    <div class="panel">
+                        <div class="panel-header wrap-header">
+                            <div>
+                                <h2 class="panel-title">Floors &amp; Individual Parking Spots</h2>
+                                <p class="panel-subtitle">Live spot statuses from MySQL database</p>
+                            </div>
+                            <div class="legend" aria-label="Spot status legend">
+                                <span class="legend-item"><span class="swatch swatch-available"></span>Available</span>
+                                <span class="legend-item"><span class="swatch swatch-occupied"></span>Occupied</span>
+                                <span class="legend-item"><span class="swatch swatch-reserved"></span>Reserved</span>
+                                <span class="legend-item"><span class="swatch swatch-out"></span>Out of Service</span>
+                            </div>
+                        </div>
+
+                        <div class="filter-bar">
+                            <div class="form-group inline-group">
+                                <label for="filter-floor">Floor</label>
+                                <select id="filter-floor">
+                                    <option value="ALL">All Floors</option>
+                                </select>
+                            </div>
+                            <div class="form-group inline-group">
+                                <label for="filter-spot-status">Status</label>
+                                <select id="filter-spot-status">
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="AVAILABLE">AVAILABLE</option>
+                                    <option value="OCCUPIED">OCCUPIED</option>
+                                    <option value="RESERVED">RESERVED</option>
+                                    <option value="OUT_OF_SERVICE">OUT_OF_SERVICE</option>
+                                </select>
+                            </div>
+                            <div class="form-group inline-group">
+                                <label for="filter-spot-type">Spot Type</label>
+                                <select id="filter-spot-type">
+                                    <option value="ALL">All Types</option>
+                                    <option value="BIKE">BIKE</option>
+                                    <option value="COMPACT">COMPACT</option>
+                                    <option value="LARGE">LARGE</option>
+                                    <option value="BUS">BUS</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="floors-container" class="floors-container">
+                            <p class="empty-state">Loading parking floors and spots...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Vehicle Check-in View -->
+                <section id="view-checkin" class="view-section">
+                    <div class="split-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Vehicle Check-in</h2>
+                                    <p class="panel-subtitle">Register a vehicle and allocate an available parking spot</p>
+                                </div>
+                            </div>
+
+                            <form id="checkin-form" class="form-stack" novalidate>
+                                <div class="form-group">
+                                    <label for="checkin-vehicle-number">Vehicle Registration Number <span class="required">*</span></label>
+                                    <input
+                                        type="text"
+                                        id="checkin-vehicle-number"
+                                        name="vehicleNumber"
+                                        maxlength="20"
+                                        placeholder="e.g. MH27BD3354"
+                                        required
+                                    >
+                                    <span id="err-checkin-vehicleNumber" class="field-error"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="checkin-owner-name">Owner Name <span class="required">*</span></label>
+                                    <input
+                                        type="text"
+                                        id="checkin-owner-name"
+                                        name="ownerName"
+                                        maxlength="100"
+                                        placeholder="e.g. Amir"
+                                        required
+                                    >
+                                    <span id="err-checkin-ownerName" class="field-error"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="checkin-vehicle-type">Vehicle Type <span class="required">*</span></label>
+                                    <select id="checkin-vehicle-type" name="vehicleType" required>
+                                        <option value="">Select vehicle type</option>
+                                        <option value="BIKE">BIKE (Motorcycle / Bike Spot)</option>
+                                        <option value="CAR">CAR (Compact Spot)</option>
+                                        <option value="SUV">SUV (Large Spot)</option>
+                                        <option value="TRUCK">TRUCK (Large Spot)</option>
+                                        <option value="BUS">BUS (Bus Spot)</option>
+                                    </select>
+                                    <span id="err-checkin-vehicleType" class="field-error"></span>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" id="checkin-submit-btn" class="btn btn-primary">
+                                        Check In Vehicle
+                                    </button>
+                                    <button type="reset" class="btn btn-secondary">Clear</button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Generated Parking Ticket</h2>
+                                    <p class="panel-subtitle">Allocated spot and entry details from backend</p>
+                                </div>
+                            </div>
+                            <div id="checkin-ticket-result" class="result-placeholder">
+                                <p class="empty-state">Submit the check-in form to generate a parking ticket.</p>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <!-- 4. Vehicle Check-out View -->
+                <section id="view-checkout" class="view-section">
+                    <div class="split-grid">
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Vehicle Check-out &amp; Payment</h2>
+                                    <p class="panel-subtitle">Look up an active ticket or enter details to complete check-out</p>
+                                </div>
+                            </div>
+
+                            <!-- Ticket / Vehicle Lookup Box -->
+                            <div class="lookup-box">
+                                <div class="form-group">
+                                    <label for="checkout-lookup-input">Quick Lookup (Ticket # or Vehicle #)</label>
+                                    <div class="lookup-row">
+                                        <input
+                                            type="text"
+                                            id="checkout-lookup-input"
+                                            placeholder="Enter TKT-... or vehicle number"
+                                        >
+                                        <button type="button" id="checkout-lookup-btn" class="btn btn-outline">
+                                            Find Ticket
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="checkout-active-select">Or Select Active Session</label>
+                                    <select id="checkout-active-select">
+                                        <option value="">-- Select an active ticket --</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="checkout-preview-card" class="preview-card hidden"></div>
+
+                            <form id="checkout-form" class="form-stack" novalidate>
+                                <div class="form-group">
+                                    <label for="checkout-ticket-number">Ticket Number <span class="required">*</span></label>
+                                    <input
+                                        type="text"
+                                        id="checkout-ticket-number"
+                                        name="ticketNumber"
+                                        placeholder="e.g. TKT-1784901267717-9B08F"
+                                        required
+                                    >
+                                    <span id="err-checkout-ticketNumber" class="field-error"></span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="checkout-vehicle-number">Vehicle Registration Number <span class="required">*</span></label>
+                                    <input
+                                        type="text"
+                                        id="checkout-vehicle-number"
+                                        name="vehicleNumber"
+                                        maxlength="20"
+                                        placeholder="e.g. MH27BD3354"
+                                        required
+                                    >
+                                    <span id="err-checkout-vehicleNumber" class="field-error"></span>
+                                </div>
+
+                                <div class="form-row-2">
+                                    <div class="form-group">
+                                        <label for="checkout-payment-mode">Payment Mode <span class="required">*</span></label>
+                                        <select id="checkout-payment-mode" name="paymentMode" required>
+                                            <option value="">Select payment mode</option>
+                                            <option value="UPI">UPI</option>
+                                            <option value="CARD">CARD</option>
+                                            <option value="CASH">CASH</option>
+                                            <option value="NET_BANKING">NET_BANKING</option>
+                                        </select>
+                                        <span id="err-checkout-paymentMode" class="field-error"></span>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="checkout-payment-status">Payment Status <span class="required">*</span></label>
+                                        <select id="checkout-payment-status" name="paymentStatus" required>
+                                            <option value="SUCCESS">SUCCESS</option>
+                                            <option value="FAILED">FAILED</option>
+                                            <option value="PENDING">PENDING</option>
+                                            <option value="REFUNDED">REFUNDED</option>
+                                        </select>
+                                        <span id="err-checkout-paymentStatus" class="field-error"></span>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="submit" id="checkout-submit-btn" class="btn btn-primary">
+                                        Complete Check-out
+                                    </button>
+                                    <button type="reset" id="checkout-reset-btn" class="btn btn-secondary">Clear</button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section class="panel">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Check-out Summary &amp; Receipt</h2>
+                                    <p class="panel-subtitle">Entry/exit timestamps, parking charges, and payment record</p>
+                                </div>
+                            </div>
+                            <div id="checkout-result" class="result-placeholder">
+                                <p class="empty-state">Complete check-out to view parking charges and payment details.</p>
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <!-- 5. Parking History View -->
+                <section id="view-history" class="view-section">
+                    <div class="panel">
+                        <div class="panel-header wrap-header">
+                            <div>
+                                <h2 class="panel-title">Parking Ticket History</h2>
+                                <p class="panel-subtitle">All recorded parking sessions ordered by latest entry</p>
+                            </div>
+                        </div>
+
+                        <form id="history-filter-form" class="filter-bar">
+                            <div class="form-group inline-group grow">
+                                <label for="history-vehicle-filter">Vehicle Number</label>
+                                <input
+                                    type="text"
+                                    id="history-vehicle-filter"
+                                    placeholder="Filter by vehicle number (e.g. MH27BD3354)"
+                                >
+                            </div>
+                            <div class="form-group inline-group">
+                                <label for="history-status-filter">Ticket Status</label>
+                                <select id="history-status-filter">
+                                    <option value="">All Statuses</option>
+                                    <option value="ACTIVE">ACTIVE</option>
+                                    <option value="COMPLETED">COMPLETED</option>
+                                    <option value="LOST">LOST</option>
+                                </select>
+                            </div>
+                            <div class="filter-actions">
+                                <button type="submit" class="btn btn-primary">Apply Filter</button>
+                                <button type="button" id="history-reset-btn" class="btn btn-secondary">Reset</button>
+                            </div>
+                        </form>
+
+                        <div id="history-table-container" class="table-responsive">
+                            <p class="empty-state">Loading parking history...</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script defer src="js/api.js"></script>
+    <script defer src="js/app.js"></script>
+    <script defer src="js/dashboard.js"></script>
+    <script defer src="js/parking.js"></script>
+    <script defer src="js/checkin.js"></script>
+    <script defer src="js/checkout.js"></script>
+    <script defer src="js/history.js"></script>
+</body>
+</html>
